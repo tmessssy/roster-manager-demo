@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Roster Manager</title>
+<meta name="theme-color" content="#1f3a5f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Roster Beta">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="meets_styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+</head>
+<body class="app-booting auth-locked">
+<div id="authOverlay" class="auth-overlay" data-mode="login" data-busy="false">
+  <div class="auth-card">
+    <div class="auth-kicker">Hosted Beta</div>
+    <h1 id="authTitle" class="auth-title">Unlock Your Local Account</h1>
+    <p id="authSubtitle" class="auth-subtitle">Enter your device-local username and password to unlock saved data.</p>
+    <div id="authError" class="auth-error"></div>
+    <label class="auth-label" for="authUsername">Username</label>
+    <input id="authUsername" class="auth-input" type="text" autocapitalize="none" autocomplete="username" placeholder="e.g. coachdemo">
+    <label class="auth-label" for="authPassword">Password</label>
+    <input id="authPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="At least 6 characters">
+    <div id="authConfirmRow">
+      <label class="auth-label" for="authPasswordConfirm">Confirm Password</label>
+      <input id="authPasswordConfirm" class="auth-input" type="password" autocomplete="new-password" placeholder="Re-enter password">
+    </div>
+    <button id="authSubmitBtn" class="auth-primary" type="button" onclick="WebBetaAuth.submit()">Unlock Local Account</button>
+    <div class="auth-actions">
+      <button class="auth-secondary" type="button" onclick="WebBetaAuth.switchMode()" id="authSwitchModeBtn">Create New Account</button>
+      <button class="auth-secondary" type="button" onclick="WebBetaAuth.deleteSelected()">Delete Local Account</button>
+    </div>
+    <div class="auth-note">Your roster data stays in this browser on this device. There is no server recovery if you forget your password.</div>
+    <div id="authAccountList" class="auth-account-list"></div>
+  </div>
+</div>
+<div id="bridgeStatusBar" class="live-banner" style="display:none;margin:0 14px 11px 14px;"></div>
+<div class="topbar">
+
+  <!-- Row 1: identity -->
+  <div class="topbar-identity">
+    <div class="logo-box" id="lbox" onclick="openModal('mlogo')" title="Edit team branding">
+      <span id="ltxt" class="logo-initials">DSC</span>
+      <img id="limg" src="" style="display:none;max-height:44px;max-width:120px;object-fit:contain;">
+    </div>
+    <div class="tn"><span id="tns">Demo Swim Club</span></div>
+    <button id="themeToggleBtn" class="theme-toggle" onclick="toggleTheme()">Dark</button>
+  </div>
+
+  <!-- Row 2: nav tabs -->
+  <nav class="ntabs">
+    <button class="ntab active" data-page="roster" onclick="showPage('roster')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M0-240v-63q0-43 44-70t116-27q13 0 25 .5t23 2.5q-14 21-21 44t-7 48v65H0Zm240 0v-65q0-32 17.5-58.5T307-410q32-20 76.5-30t96.5-10q53 0 97.5 10t76.5 30q32 20 49 46.5t17 58.5v65H240Zm540 0v-65q0-26-6.5-49T754-397q11-2 22.5-2.5t23.5-.5q72 0 116 26.5t44 70.5v63H780Zm-455-80h311q-10-20-55.5-35T480-370q-55 0-100.5 15T325-320ZM160-440q-33 0-56.5-23.5T80-520q0-34 23.5-57t56.5-23q34 0 57 23t23 57q0 33-23 56.5T160-440Zm640 0q-33 0-56.5-23.5T720-520q0-34 23.5-57t56.5-23q34 0 57 23t23 57q0 33-23 56.5T800-440Zm-320-40q-50 0-85-35t-35-85q0-51 35-85.5t85-34.5q51 0 85.5 34.5T600-600q0 50-34.5 85T480-480Zm0-80q17 0 28.5-11.5T520-600q0-17-11.5-28.5T480-640q-17 0-28.5 11.5T440-600q0 17 11.5 28.5T480-560Zm1 240Zm-1-280Z"/></svg> Roster</button>
+    <button class="ntab" data-page="chart" onclick="showPage('chart')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M280-280h80v-280h-80v280Zm160 0h80v-400h-80v400Zm160 0h80v-160h-80v160ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg> Chart</button>
+    <button class="ntab" data-page="overview" onclick="showPage('overview')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M852-212 732-332l56-56 120 120-56 56ZM708-692l-56-56 120-120 56 56-120 120Zm-456 0L132-812l56-56 120 120-56 56ZM108-212l-56-56 120-120 56 56-120 120Zm246-75 126-76 126 77-33-144 111-96-146-13-58-136-58 135-146 13 111 97-33 143ZM233-120l65-281L80-590l288-25 112-265 112 265 288 25-218 189 65 281-247-149-247 149Zm247-361Z"/></svg> Overview</button>
+    <button class="ntab" data-page="meets" onclick="showPage('meets')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M360-720h80v-80h-80v80Zm160 0v-80h80v80h-80ZM360-400v-80h80v80h-80Zm320-160v-80h80v80h-80Zm0 160v-80h80v80h-80Zm-160 0v-80h80v80h-80Zm160-320v-80h80v80h-80Zm-240 80v-80h80v80h-80ZM200-160v-640h80v80h80v80h-80v80h80v80h-80v320h-80Zm400-320v-80h80v80h-80Zm-160 0v-80h80v80h-80Zm-80-80v-80h80v80h-80Zm160 0v-80h80v80h-80Zm80-80v-80h80v80h-80Z"/></svg>Meets</button>
+    <button class="ntab" data-page="standards" onclick="showPage('standards')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M280-120v-80h160v-124q-49-11-87.5-41.5T296-442q-75-9-125.5-65.5T120-640v-40q0-33 23.5-56.5T200-760h80v-80h400v80h80q33 0 56.5 23.5T840-680v40q0 76-50.5 132.5T664-442q-18 46-56.5 76.5T520-324v124h160v80H280Zm0-408v-152h-80v40q0 38 22 68.5t58 43.5Zm285 93q35-35 35-85v-240H360v240q0 50 35 85t85 35q50 0 85-35Zm115-93q36-13 58-43.5t22-68.5v-40h-80v152Zm-200-52Z"/></svg>Standards</button>
+    <button class="ntab" data-page="analytics" onclick="showPage('analytics')">Analytics</button>
+    <button class="ntab" data-page="settings" onclick="showPage('settings')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></svg> Settings</button>
+  </nav>
+</div>
+
+<div id="page-roster" class="page active">
+  <div class="fbar">
+    <div class="gtog">
+      <button class="gbtn aa" id="gA" onclick="setGF('all')">ALL</button>
+      <button class="gbtn" id="gM" onclick="setGF('male')">MEN</button>
+      <button class="gbtn" id="gF" onclick="setGF('female')">WOMEN</button>
+    </div>
+    <input class="sbox" type="text" id="srch" placeholder="Search athlete…" oninput="renderRoster()">
+  </div>
+  <div id="rosterList"></div>
+</div>
+
+<div id="page-profile" class="page">
+  <div class="bbtn" onclick="showPage('roster')">← Back to Roster</div>
+  <div id="profileContent"></div>
+</div>
+
+<div id="page-chart" class="page">
+  <div class="fbar">
+    <button class="tbtn active" id="cgBtn" onclick="toggleCG()">WOMEN</button>
+    <span style="font-size:11px;color:var(--muted);margin-left:auto;">← Scroll →</span>
+  </div>
+  <div class="rcwrap"><table class="rct" id="rctTbl"></table></div>
+</div>
+
+<div id="page-overview" class="page">
+  <div class="sgrid" id="ovStats"></div>
+  <div class="card">
+    <div class="sechdr">
+      <div class="ctitle" style="margin-bottom:0"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M607.5-212.5Q660-265 660-340t-52.5-127.5Q555-520 480-520t-127.5 52.5Q300-415 300-340t52.5 127.5Q405-160 480-160t127.5-52.5ZM363-572q20-11 42.5-17.5T451-598L350-800H250l113 228Zm234 0 114-228H610l-85 170 19 38q14 4 27 8.5t26 11.5ZM256-208q-17-29-26.5-62.5T220-340q0-36 9.5-69.5T256-472q-42 14-69 49.5T160-340q0 47 27 82.5t69 49.5Zm448 0q42-14 69-49.5t27-82.5q0-47-27-82.5T704-472q17 29 26.5 62.5T740-340q0 36-9.5 69.5T704-208ZM403.5-91.5Q367-103 336-123q-9 2-18 2.5t-19 .5q-91 0-155-64T80-339q0-87 58-149t143-69L120-880h280l80 160 80-160h280L680-559q85 8 142.5 70T880-340q0 92-64 156t-156 64q-9 0-18.5-.5T623-123q-31 20-67 31.5T480-80q-40 0-76.5-11.5ZM480-340ZM363-572 250-800l113 228Zm234 0 114-228-114 228ZM406-230l28-91-74-53h91l29-96 29 96h91l-74 53 28 91-74-56-74 56Z"/></svg>Leaderboard</div>
+      <div style="display:flex;gap:5px;align-items:center;">
+        <button class="btn bsm bs" id="lbgBtn" onclick="toggleLbG()">All</button>
+        <select class="fi" id="lbStdSel" onchange="renderLB()" style="padding:4px 8px;font-size:11px;width:auto;"></select>
+      </div>
+    </div>
+    <div id="leaderboard" style="margin-top:11px;"></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Cuts by Event</div>
+    <div class="stabs" id="evStrokeTabs"></div>
+    <div id="evChart"></div>
+  </div>
+  <div class="card"><div class="ctitle">Cuts by Stroke</div><div id="strokeChart"></div></div>
+  <div class="card"><div class="ctitle">Cuts by Standard</div><div id="stdBarChart"></div></div>
+  <div class="card">
+    <div class="sechdr">
+      <div class="ctitle" style="margin-bottom:0">On the Bubble</div>
+      <div class="gtog">
+        <button class="gbtn aa" id="bbgAll" onclick="setBubbleG('all')">All</button>
+        <button class="gbtn" id="bbgM" onclick="setBubbleG('male')">Men</button>
+        <button class="gbtn" id="bbgF" onclick="setBubbleG('female')">Women</button>
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--muted);margin-bottom:11px;" id="bubbleThresholdNote"></div>
+    <div id="bubbleList"></div>
+  </div>
+</div>
+
+<!-- ── NEW: Meets page ── -->
+<div id="page-meets" class="page">
+  <div class="fbar">
+    <span style="font-weight:700;font-size:15px;"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M360-720h80v-80h-80v80Zm160 0v-80h80v80h-80ZM360-400v-80h80v80h-80Zm320-160v-80h80v80h-80Zm0 160v-80h80v80h-80Zm-160 0v-80h80v80h-80Zm160-320v-80h80v80h-80Zm-240 80v-80h80v80h-80ZM200-160v-640h80v80h80v80h-80v80h80v80h-80v320h-80Zm400-320v-80h80v80h-80Zm-160 0v-80h80v80h-80Zm-80-80v-80h80v80h-80Zm160 0v-80h80v80h-80Zm80-80v-80h80v80h-80Z"/></svg>Meets</span>
+    <button class="btn bsm bp" style="margin-left:auto" onclick="openAddMeet()">+ Add Meet</button>
+  </div>
+  <div id="meetsPageContent"></div>
+</div>
+
+<!-- ── NEW: Meet Detail page ── -->
+<div id="page-meetDetail" class="page">
+  <div class="bbtn" onclick="showPage('meets')">← Back to Meets</div>
+  <div id="meetDetailContent"></div>
+</div>
+
+<div id="page-analytics" class="page">
+  <div class="fbar">
+    <span style="font-weight:700;font-size:15px;">Analytics</span>
+  </div>
+  <div id="analyticsPageContent"></div>
+</div>
+
+<div id="page-standards" class="page">
+  <div class="fbar">
+    <button class="tbtn active" id="svgBtn" onclick="toggleSVG()">Women</button>
+    <button class="btn bsm bs" style="margin-left:auto" onclick="openModal('mstds')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m370-80-16-128q-13-5-24.5-12T307-235l-119 50L78-375l103-78q-1-7-1-13.5v-27q0-6.5 1-13.5L78-585l110-190 119 50q11-8 23-15t24-12l16-128h220l16 128q13 5 24.5 12t22.5 15l119-50 110 190-103 78q1 7 1 13.5v27q0 6.5-2 13.5l103 78-110 190-118-50q-11 8-23 15t-24 12L590-80H370Zm70-80h79l14-106q31-8 57.5-23.5T639-327l99 41 39-68-86-65q5-14 7-29.5t2-31.5q0-16-2-31.5t-7-29.5l86-65-39-68-99 42q-22-23-48.5-38.5T533-694l-13-106h-79l-14 106q-31 8-57.5 23.5T321-633l-99-41-39 68 86 64q-5 15-7 30t-2 32q0 16 2 31t7 30l-86 65 39 68 99-42q22 23 48.5 38.5T427-266l13 106Zm42-180q58 0 99-41t41-99q0-58-41-99t-99-41q-59 0-99.5 41T342-480q0 58 40.5 99t99.5 41Zm-2-140Z"/></svg>Manage</button>
+  </div>
+  <div class="twrap"><table class="stdtbl" id="stdsTbl"></table></div>
+</div>
+
+<div id="page-settings" class="page">
+  <div class="card">
+    <div class="sechdr">
+      <div class="ctitle" style="margin-bottom:0">Local Account</div>
+      <button class="btn bsm bs" onclick="WebBetaAuth.showLogin()">Switch</button>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div>
+        <div id="accountName" style="font-size:16px;font-weight:800;">Not signed in</div>
+        <div id="accountNote" style="font-size:11px;color:var(--muted);margin-top:4px;">Unlock a local account to load saved data.</div>
+      </div>
+      <button class="btn bd" onclick="WebBetaAuth.logout()">Log Out</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Team Info</div>
+    <div class="fg"><label class="fl">Team Name</label><input type="text" class="fi" id="stn" placeholder="Team Name" oninput="updateTeamName(this.value)"></div>
+    <div class="fg"><label class="fl">Team Logo</label>
+      <div class="loup">
+        <input type="file" accept="image/*" onchange="handleLogo(event)" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
+        <div style="font-size:28px;margin-bottom:6px;"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h320v80H200v560h560v-320h80v320q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-320v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></svg></div>
+        <div style="font-size:12px;color:var(--muted);">Upload Team Logo</div>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:0;">
+      <label class="fl">App Theme</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+        <button class="btn bs" id="themeSettingBtn" onclick="toggleTheme()" style="flex:1;">Switch to Light Mode</button>
+        <span style="font-size:10px;color:var(--muted);" id="themeSettingNote">Currently: Dark</span>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="sechdr"><div class="ctitle" style="margin-bottom:0">Time Standards</div><button class="btn bsm bp" onclick="openModal('mstds')">Manage</button></div>
+    <div id="settStds" style="margin-top:9px;"></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Data</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <button class="btn bs" onclick="exportData()"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m720-120 160-160-56-56-64 64v-167h-80v167l-64-64-56 56 160 160ZM560 0v-80h320V0H560ZM240-160q-33 0-56.5-23.5T160-240v-560q0-33 23.5-56.5T240-880h280l240 240v121h-80v-81H480v-200H240v560h240v80H240Zm0-80v-560 560Z"/></svg>Export JSON</button>
+      <label class="btn bs" style="cursor:pointer;"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M240-80q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h320l240 240v240h-80v-200H520v-200H240v640h360v80H240Zm638 15L760-183v89h-80v-226h226v80h-90l118 118-56 57Zm-638-95v-640 640Z"/></svg>Import JSON<input type="file" accept=".json" onchange="importData(event)" style="display:none;"></label>
+      <button class="btn bd" onclick="resetData()"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z"/></svg>Reset All</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Quick Stats</div>
+    <div id="settingsQuickStats" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+  </div>
+  <div class="card">
+    <div class="ctitle">Printable Charts</div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px;">
+      <button class="btn bp bfl" onclick="openRosterCardModal()">Print Full Roster Card</button>
+      <button class="btn bs bfl" onclick="printStandardsCard()">Print Standards Card</button>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <button class="btn bs" onclick="printRoster('female')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M760-200H320q-33 0-56.5-23.5T240-280v-560q0-33 23.5-56.5T320-920h280l240 240v400q0 33-23.5 56.5T760-200ZM560-640v-200H320v560h440v-360H560ZM160-40q-33 0-56.5-23.5T80-120v-560h80v560h440v80H160Zm160-800v200-200 560-560Z"/></svg>Save Women's Roster PDF</button>
+      <button class="btn bs" onclick="printRoster('male')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M760-200H320q-33 0-56.5-23.5T240-280v-560q0-33 23.5-56.5T320-920h280l240 240v400q0 33-23.5 56.5T760-200ZM560-640v-200H320v560h440v-360H560ZM160-40q-33 0-56.5-23.5T80-120v-560h80v560h440v80H160Zm160-800v200-200 560-560Z"/></svg>Save Men's Roster PDF</button>
+      <button class="btn bs" onclick="printStds()"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="M760-200H320q-33 0-56.5-23.5T240-280v-560q0-33 23.5-56.5T320-920h280l240 240v400q0 33-23.5 56.5T760-200ZM560-640v-200H320v560h440v-360H560ZM160-40q-33 0-56.5-23.5T80-120v-560h80v560h440v80H160Zm160-800v200-200 560-560Z"/></svg>Save Standards PDF</button>
+    </div>
+  </div>
+</div>
+
+<button class="fab" id="fabBtn" onclick="openAddAth()">+</button>
+
+<!-- Add / Edit Athlete -->
+<div class="mov" id="math"><div class="modal">
+  <div class="mtitle"><span id="athMT">Add Athlete</span><button class="mx" onclick="closeModal('math')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div class="fg"><label class="fl">Full Name</label><input type="text" class="fi" id="inAN" placeholder="First Last"></div>
+  <div class="fr">
+    <div class="fg"><label class="fl">Gender</label><select class="fi" id="inAG"><option value="female">Female</option><option value="male">Male</option></select></div>
+    <div class="fg"><label class="fl">Age / Grade</label><input type="text" class="fi" id="inAA" placeholder="e.g. 16 / Jr"></div>
+  </div>
+  <div class="brow2"><button class="btn bp bfl" onclick="saveAthlete()">Save Athlete</button></div>
+</div></div>
+
+<!-- Edit Times -->
+<div class="mov" id="mtimes"><div class="modal">
+  <div class="mtitle"><span id="timesMT">Edit Times</span><button class="mx" onclick="closeModal('mtimes')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div class="stabs" id="teSTabs"></div>
+  <div class="tegrid" id="teGrid"></div>
+  <div class="brow2"><button class="btn bp bfl" onclick="saveTimes()">Save Times</button></div>
+</div></div>
+
+<!-- Manage Standards -->
+<div class="mov" id="mstds"><div class="modal">
+  <div class="mtitle">Manage Standards<button class="mx" onclick="closeModal('mstds')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div id="stdList"></div>
+  <div id="addStdBtn"></div>
+  <div id="addStdForm" style="display:none;"></div>
+  <div id="editStdForm" style="display:none;"></div>
+</div></div>
+
+<!-- Team Branding -->
+<div class="mov" id="mlogo"><div class="modal">
+  <div class="mtitle">Team Branding<button class="mx" onclick="closeModal('mlogo')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div class="fg"><label class="fl">Team Name</label><input type="text" class="fi" id="logoTN" placeholder="Team Name" oninput="updateTeamName(this.value)"></div>
+  <div class="fg"><label class="fl">Logo</label>
+    <div class="loup">
+      <input type="file" accept="image/*" onchange="handleLogo(event)" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:10;">
+      <div style="font-size:28px;margin-bottom:6px;"><svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M480-480ZM200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h320v80H200v560h560v-320h80v320q0 33-23.5 56.5T760-120H200Zm40-160h480L570-480 450-320l-90-120-120 160Zm440-320v-80h-80v-80h80v-80h80v80h80v80h-80v80h-80Z"/></svg></div>
+      <div style="font-size:12px;color:var(--muted);">Tap to upload</div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;margin-top:10px;">
+    <div class="logo-circle" id="lprev" style="width:60px;height:60px;font-size:22px;">
+      <span id="lptxt">DSC</span><img id="lpimg" src="" style="display:none;position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;">
+    </div>
+  </div>
+</div></div>
+
+<!-- ── NEW: Add/Edit Meet modal ── -->
+<div class="mov" id="mMeet"><div class="modal">
+  <div class="mtitle"><span id="meetModalTitle">Add Meet</span><button class="mx" onclick="closeModal('mMeet')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div class="fg"><label class="fl">Meet Name</label><input type="text" class="fi" id="mMeetName" placeholder="e.g. PNS Champs 2025"></div>
+  <div class="fr">
+    <div class="fg"><label class="fl">Date</label><input type="date" class="fi" id="mMeetDate"></div>
+    <div class="fg"><label class="fl">Course</label>
+      <select class="fi" id="mMeetCourse">
+        <option value="SCY">SCY (25 yards)</option>
+        <option value="LCM">LCM (50 meters)</option>
+        <option value="SCM">SCM (25 meters)</option>
+      </select>
+    </div>
+  </div>
+  <div class="fg"><label class="fl">Location (optional)</label><input type="text" class="fi" id="mMeetLocation" placeholder="e.g. Northside Aquatic Center"></div>
+  <div class="fg">
+    <label class="fl">HY-TEK Live Results URL (optional)</label>
+    <input type="text" class="fi" id="mMeetUrl" placeholder="http://results.hy-tekltd.com/...">
+    <div style="font-size:10px;color:var(--muted);margin-top:4px;">Paste the live results URL to enable automatic result polling during the meet.</div>
+  </div>
+  <div class="brow2"><button class="btn bp bfl" onclick="saveMeet()">Save Meet</button></div>
+</div></div>
+
+<!-- ── NEW: Add Result modal ── -->
+<div class="mov" id="mResult"><div class="modal">
+  <div class="mtitle">Add Result<button class="mx" onclick="closeModal('mResult')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div class="fg"><label class="fl">Athlete</label><select class="fi" id="mResultAthlete"></select></div>
+  <div class="fg"><label class="fl">Event</label><select class="fi" id="mResultEvent"></select></div>
+  <div class="fr">
+    <div class="fg"><label class="fl">Time</label><input type="text" class="fi" id="mResultTime" placeholder="e.g. 53.42 or 1:52.34"></div>
+    <div class="fg"><label class="fl">Place (optional)</label><input type="number" class="fi" id="mResultPlace" placeholder="e.g. 3"></div>
+  </div>
+  <div class="brow2"><button class="btn bp bfl" onclick="saveResult()">Save Result</button></div>
+</div></div>
+
+
+<!-- ── Print Roster Card modal ── -->
+<div class="mov" id="mRosterCard"><div class="modal">
+  <div class="mtitle"><span>Print Roster Card</span><button class="mx" onclick="closeModal('mRosterCard')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+  <div class="fr" style="margin-bottom:13px;">
+    <div class="fg">
+      <label class="fl">Sort Athletes By</label>
+      <select class="fi" id="rcSortSel">
+        <option value="name">First Name A–Z</option>
+        <option value="last">Last Name A–Z</option>
+        <option value="added">Order Added</option>
+      </select>
+    </div>
+    <div class="fg">
+      <label class="fl">Include Courses</label>
+      <div style="display:flex;gap:12px;margin-top:7px;">
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;"><input type="checkbox" id="rcIncSCY" checked> SCY</label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:13px;"><input type="checkbox" id="rcIncLCM" checked> LCM</label>
+      </div>
+    </div>
+  </div>
+  <div class="ctitle">Standard Colors</div>
+  <div id="rcColorList" style="margin-bottom:9px;"></div>
+  <button class="btn bs bsm" onclick="rcResetColors()" style="margin-bottom:13px;">Reset to App Colors</button>
+  <div class="brow2"><button class="btn bp bfl" onclick="doRosterCardPrint()">Generate &amp; Print</button></div>
+</div></div>
+
+
+<!-- HY-TEK Results Importer modal -->
+<div class="mov" id="mHytek"><div class="modal">
+  <div class="mtitle"><span>Import HY-TEK Results</span>
+    <button class="mx" onclick="closeModal('mHytek')"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="currentColor"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button>
+  </div>
+
+  <div class="fr" style="margin-bottom:11px;">
+    <div class="fg">
+      <label class="fl">Club Code</label>
+      <input type="text" class="fi" id="hytekClubInput" placeholder="e.g. DSC"
+             style="text-transform:uppercase;letter-spacing:1px;" maxlength="6">
+      <div style="font-size:10px;color:var(--muted);margin-top:3px;">
+        Your team code in HY-TEK. Leave blank to match by name only.
+      </div>
+    </div>
+    <div class="fg">
+      <label class="fl">Results File</label>
+      <label class="btn bs bfl" style="cursor:pointer;justify-content:center;">
+        Choose .zip or .hy3
+        <input type="file" id="hytekFileInput" accept=".zip,.hy3,.HY3"
+               onchange="hytekFileSelected(this)" style="display:none;">
+      </label>
+    </div>
+  </div>
+
+  <div id="hytekStatus" style="font-size:11px;color:var(--muted);margin-bottom:10px;
+       padding:8px 10px;background:var(--sur2);border-radius:7px;line-height:1.5;">
+    Upload the .zip file from HY-TEK Meet Manager.
+  </div>
+
+  <div id="hytekPreview" style="max-height:340px;overflow-y:auto;"></div>
+
+  <div class="brow2" style="margin-top:11px;">
+    <button class="btn bp bfl" id="hytekImportBtn"
+            onclick="commitHytekImport()" style="display:none;">Import Results</button>
+  </div>
+</div></div>
+
+<!-- Color Picker Overlay -->
+<div class="cs-overlay" id="csOverlay" onclick="if(event.target===this)closeColorPicker()">
+  <div class="cs-box">
+    <div class="cs-title">Pick a Color<button class="mx" onclick="closeColorPicker()"><svg xmlns="http://www.w3.org/2000/svg" height="16px" viewBox="0 -960 960 960" width="16px" fill="#e3e3e3"><path d="m256-200-56-56 224-224-224-224 56-56 224 224 224-224 56 56-224 224 224 224-56 56-224-224-224 224Z"/></svg></button></div>
+    <div class="cs-preview" id="csPreview"></div>
+    <canvas class="cs-canvas" id="csCanvas"></canvas>
+    <input type="range" class="cs-hue" id="csHue" min="0" max="360" value="210" oninput="csUpdateSpectrum()">
+    <div class="cs-hex-row">
+      <span class="cs-hash">#</span>
+      <input type="text" class="cs-hex" id="csHexIn" maxlength="6" placeholder="2563eb" oninput="csHexTyped()">
+      <button class="btn bp bsm" onclick="csConfirm()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<script src="bridge.js"></script>
+<script src="auth.js"></script>
+<script src="app.js"></script>
+<script src="meets.js"></script>
+<script src="roster_card.js"></script>
+<script src="standards_card.js"></script>
+<script src="profile_roadmap.js"></script>
+<script src="analytics.js"></script>
+<script src="meetmobile_bridge.js"></script>
+<script src="bubble_threshold_fix.js"></script>
+<script src="hytek_importer.js"></script>
+
+<script>
+// ── Bubble widget state ──────────────────────────────────────
+let bubbleGender = 'all';
+function setBubbleG(g) {
+  bubbleGender = g;
+  document.getElementById('bbgAll').className = 'gbtn' + (g === 'all'    ? ' aa' : '');
+  document.getElementById('bbgM').className   = 'gbtn' + (g === 'male'   ? ' am' : '');
+  document.getElementById('bbgF').className   = 'gbtn' + (g === 'female' ? ' af' : '');
+  if (typeof renderBubbleThresholdNote === 'function') renderBubbleThresholdNote();
+  if (typeof renderBubbleWidget === 'function') renderBubbleWidget(g);
+}
+</script>
+
+<!-- ── PATCH: wire meets into showPage + save + loadState ── -->
+<script>
+// Patch showPage to handle meets pages and hide FAB
+const _origShowPageMeets = showPage;
+showPage = function(p) {
+  initMeets();
+  _origShowPageMeets(p);
+  if (p === 'meets') {
+    renderMeetsPage();
+    document.getElementById('fabBtn').style.display = 'none';
+  }
+  if (p === 'meetDetail') {
+    document.getElementById('fabBtn').style.display = 'none';
+  }
+  if (p !== 'meets' && p !== 'meetDetail') {
+    document.getElementById('fabBtn').style.display = '';
+  }
+};
+
+initMeets();
+if (typeof WebBetaAuth !== 'undefined' && typeof WebBetaAuth.renderAccountPanel === 'function') {
+  WebBetaAuth.renderAccountPanel();
+}
+</script>
+</body>
+</html>
