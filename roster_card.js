@@ -124,7 +124,7 @@ const RC_COLUMNS = [
 ];
 
 // ── Core HTML builder ─────────────────────────────────────────
-function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true) {
+function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true, athleteOverride = null) {
   const teamName  = S.teamName || 'Swim Team';
   const logoSrc   = S.teamLogo || null;
   const standards = [...S.standards].sort((a, b) => a.priority - b.priority);
@@ -140,6 +140,9 @@ function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true) {
   // +1 for the name/label column only (no gender symbol column)
   const totalCols = cols.reduce((s, c) => s + c.pairs.length, 0) + 1;
 
+  // Use override list if provided, otherwise fall back to full roster
+  const allAthletes = athleteOverride || S.athletes;
+
   function sortAthletes(arr) {
     return [...arr].sort((a, b) => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
@@ -149,8 +152,8 @@ function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true) {
     });
   }
 
-  const females = sortAthletes(S.athletes.filter(a => a.gender === 'female'));
-  const males   = sortAthletes(S.athletes.filter(a => a.gender === 'male'));
+  const females = sortAthletes(allAthletes.filter(a => a.gender === 'female'));
+  const males   = sortAthletes(allAthletes.filter(a => a.gender === 'male'));
 
   const initials = teamName.split(' ').map(w => w[0]).join('').slice(0, 4).toUpperCase();
   const logoImg  = logoSrc
@@ -186,7 +189,20 @@ function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true) {
     });
     return `<thead><tr>${r1}</tr><tr>${r2}</tr></thead>`;
   }
-
+    function colHeaders2() {
+      let r1 = `<th rowspan="2" style="text-align:left;white-space:nowrap;padding:2px 5px;font-size:7px;background:#111;color:#fff;border:1px solid #2a2a2a;min-width:82px;">ATHLETE / STANDARD</th>`;
+      cols.forEach(col => {
+        const dimmed = col.stdBlank;
+        r1 += `<th style="font-size:5.5px;font-weight:700;padding:1px;background:${col.stdBlank?'#111':'#2a2a2a'};color:${col.stdBlank?'#2a2a2a':'#bbb'};border:1px solid #2a2a2a;">${p.c === 'SCY' ? 'Y' : 'M'}</th>`;
+      });
+      let r2 = '';
+      cols.forEach(col => {
+        col.pairs.forEach(p => {
+          r2 += `<th colspan="${col.pairs.length}" style="font-size:6px;font-weight:700;padding:2px 1px;background:${dimmed?'#1a1a1a':'#222'};color:${dimmed?'#3a3a3a':'#fff'};border:1px solid #2a2a2a;white-space:nowrap;">${col.label}</th>`;
+        });
+      });
+      return `<thead><tr>${r1}</tr><tr>${r2}</tr></thead>`;
+  }
   // ── Athlete data row ───────────────────────────────────────
   function athleteRow(a, i) {
     const bg = i % 2 === 0 ? '#fff' : '#f7f7f7';
@@ -250,8 +266,7 @@ function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true) {
   // ── Legend strip ───────────────────────────────────────────
   const legend = standards.map(s =>
     `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:8px;">
-       <span style="width:8px;height:8px;border-radius:2px;background:${stdColors[s.id]};display:inline-block;"></span>
-       <span style="font-size:6px;font-weight:700;color:#444;font-family:Arial,sans-serif;">${s.name}</span>
+       <><span style="width:8px;height:8px;border-radius:2px;background:${stdColors[s.id]};display:inline-block;"></span><span style="font-size:6px;font-weight:700;color:#444;font-family:Arial,sans-serif;">${s.name}</span></>
      </span>`
   ).join('');
 
@@ -281,7 +296,7 @@ function buildRosterCardHTML(sortBy = 'name', inclSCY = true, inclLCM = true) {
 <style>
 @page { size: 11in 8.5in landscape; margin: 0.22in; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Arial Narrow', Arial, sans-serif; background: #fff; }
+body { font-family: 'Arial', Arial, sans-serif; background: #fff; }
 @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 </head>
@@ -326,7 +341,14 @@ body { font-family: 'Arial Narrow', Arial, sans-serif; background: #fff; }
       ${standards.map((std, i) => standardRow(std, 'M', i)).join('')}
 
     </tbody>
+    ${colHeaders2()}
   </table>
+
+<!-- Legend -->
+  <div style="display:flex;align-items:center;justify-content:center;flex-wrap:wrap;background:#f5f5f5;border:1px solid #ddd;border-radius:3px;padding:2px 6px;margin-bottom:3px;gap:2px;">
+    <span style="font-size:5.5px;font-weight:700;color:#555;margin-right:5px;text-transform:uppercase;letter-spacing:.5px;font-family:Arial,sans-serif;">Standards:</span>
+    ${legend}
+  </div>
 
   <!-- Footer -->
   <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:3px 8px;background:#1a1a1a;border-top:2px solid #934337;margin-top:3px;">

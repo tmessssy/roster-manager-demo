@@ -627,7 +627,7 @@ function parseLiveResults(html, meet) {
   return results;
 }
 
-// Match a raw imported meet name to a roster athlete
+// Match a raw name like "CHEN, ELAINE" or "Elaine Chen" to a roster athlete
 function matchAthleteByName(rawName) {
   const cleaned = rawName.toLowerCase().replace(/[^a-z\s]/g, '').trim();
 

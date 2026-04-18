@@ -5,9 +5,10 @@
 // ============================================================
 
 // ── State ─────────────────────────────────────────────────────
-let _roadmapMode   = 'overview';   // 'overview' | 'roadmap' | 'nearest'
-let _roadmapStdId  = null;         // which standard is selected in roadmap mode
-let _profileAthId  = null;         // current athlete being viewed
+let _roadmapMode      = 'overview';   // 'overview' | 'roadmap' | 'nearest'
+let _roadmapStdId     = null;         // which standard is selected in roadmap mode
+let _profileAthId     = null;         // current athlete being viewed
+let _profileActiveStd = null;         // active standard color toggle on profile
 
 function roadmapIcon(symbol, className) {
   return `<span class="${className} material-symbols-outlined rm-ms-icon" aria-hidden="true">${symbol}</span>`;
@@ -18,6 +19,7 @@ function initProfileRoadmap(athleteId) {
   _profileAthId  = athleteId;
   _roadmapMode   = 'overview';
   _roadmapStdId  = null;
+  _profileActiveStd = null;  // reset std toggle when switching athletes
 }
 
 // ── Build the mode selector UI ────────────────────────────────
@@ -86,6 +88,8 @@ function setRoadmapMode(mode, athleteId) {
   }
 
   _updateActiveLabel();
+  // Reset std override when switching view modes
+  _profileActiveStd = null;
   rerenderTimesGrid(athleteId);
 }
 
@@ -378,6 +382,108 @@ function _proximityBorder(p) {
   return 'rgba(74,222,128,0.65)';
 }
 
+// ── Profile Standard Color Toggle ────────────────────────────
+
+function buildProfileStdToggles(athleteId, stats) {
+  const hasCuts = S.standards
+    .filter(s => (stats.byStd[s.id] || 0) > 0)
+    .sort((a, b) => a.priority - b.priority);
+  if (!hasCuts.length) return '';
+
+  return `<div class="profile-std-toggle-row" id="profileStdToggles_${athleteId}">` +
+    hasCuts.map(std => {
+      const n = stats.byStd[std.id] || 0;
+      const isActive = _profileActiveStd === std.id && _profileAthId === athleteId;
+      return `<button class="pst-btn ${isActive ? 'pressed' : ''}"
+        id="pst_${std.id}"
+        onclick="toggleProfileStd('${athleteId}','${std.id}')"
+        style="background:${isActive ? std.color : std.color + '22'};border-color:${isActive ? std.color : std.color + '55'};color:${isActive ? '#fff' : std.color};">
+        <span class="pst-dot" style="background:${isActive ? '#fff' : std.color};"></span>
+        ${n} ${std.name}
+      </button>`;
+    }).join('') +
+  '</div>';
+}
+
+function toggleProfileStd(athleteId, stdId) {
+  if (_profileActiveStd === stdId && _profileAthId === athleteId) {
+    _profileActiveStd = null;
+  } else {
+    _profileActiveStd = stdId;
+    _profileAthId = athleteId;
+  }
+  // Re-render times grid with the override
+  const a = S.athletes.find(x => x.id === athleteId);
+  if (!a) return;
+  const st = getStats(a);
+
+  // Update toggle button visuals in-place (no full page reload)
+  const toggleRow = document.getElementById('profileStdToggles_' + athleteId);
+  if (toggleRow) {
+    const newHtml = buildProfileStdToggles(athleteId, st);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = newHtml;
+    toggleRow.replaceWith(tmp.firstElementChild);
+  }
+
+  // Rerender times grid
+  const container = document.getElementById('rmTimesContainer');
+  if (!container) return;
+  if (_profileActiveStd && _roadmapMode === 'overview') {
+    container.innerHTML = buildOverviewGridWithStdOverride(a, _profileActiveStd);
+  } else {
+    rerenderTimesGrid(athleteId);
+  }
+}
+
+function buildOverviewGridWithStdOverride(a, activeStdId) {
+  const std = S.standards.find(s => s.id === activeStdId);
+  const tk = a.gender === 'female' ? 'timesF' : 'timesM';
+  let html = '';
+
+  for (const stroke of STROKES) {
+    const evs = EVENTS.filter(e => gStroke(e) === stroke && a.times[e]);
+    if (!evs.length) continue;
+
+    html += `<div class="rm-stroke-section">
+      <div class="ctitle">${stroke}</div>
+      <div class="tgrid">${evs.map(ev => {
+        const t = a.times[ev];
+        const ats = t2s(t);
+        const stdCutTime = std && std[tk] && std[tk][ev];
+        const stdCutSec  = stdCutTime ? t2s(stdCutTime) : null;
+        const hasThisStd = ats !== null && stdCutSec !== null && ats <= stdCutSec;
+
+        let bg, border, labelHtml;
+        if (std) {
+          if (hasThisStd) {
+            bg = std.color + '33';
+            border = std.color;
+            labelHtml = `<div class="tstd" style="color:${std.color}">● ${std.name}</div>`;
+          } else {
+            bg = 'var(--sur3)';
+            border = 'rgba(255,255,255,.05)';
+            labelHtml = '';
+          }
+        } else {
+          const c = getBestCut(a, ev);
+          bg = c ? c.color + '22' : 'var(--sur2)';
+          border = c ? c.color : 'var(--bdr)';
+          labelHtml = c ? `<div class="tstd" style="color:${c.color}">● ${c.name}</div>` : '';
+        }
+        return `<div class="tcell" style="background:${bg};border-color:${border};transition:background .3s,border-color .3s,opacity .2s;${!hasThisStd && std ? 'opacity:.5;' : ''}">
+          <div class="tev">${ev}</div>
+          <div class="tval">${t}</div>
+          ${labelHtml}
+        </div>`;
+      }).join('')}</div>
+    </div>`;
+  }
+
+  if (!html) html = `<div style="color:var(--muted);font-size:13px;padding:20px 0;text-align:center;">No times recorded yet</div>`;
+  return html;
+}
+
 // ── Full profile content builder ──────────────────────────────
 // Call this instead of the original profile renderer
 // (patched in below via showProfile override)
@@ -386,7 +492,7 @@ function buildRoadmapProfileContent(a) {
   const ini = a.name.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase();
 
   return `
-    <!-- Header (unchanged from original) -->
+    <!-- Header -->
     <div class="phdr">
       <div class="pav ${a.gender}">${ini}</div>
       <div style="flex:1;min-width:0;">
@@ -395,6 +501,8 @@ function buildRoadmapProfileContent(a) {
           ${a.gender==='female'?'♀ Female':'♂ Male'}${a.age?' · '+a.age:''} · ${Object.keys(a.times).length} events
         </div>
         <div class="brow">${badges(st,true)}</div>
+        <!-- Standard toggle pills on profile -->
+        ${buildProfileStdToggles(a.id, st)}
       </div>
     </div>
 

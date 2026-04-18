@@ -1,7 +1,7 @@
 // ============================================================
 //  standards_card.js  v2
 //  Generates a polished dark-themed Time Standards card
-//  matching the app's laminated standards sheet layout.
+//  matching the OCA laminated standards sheet exactly.
 //
 //  Load after app.js:
 //    <script src="standards_card.js"></script>

@@ -199,15 +199,12 @@ function _processHY3Text(text, clubCode) {
                 const placeM = e2.slice(13, 28).match(/0\s+(\d{1,3})\s/);
                 const place  = placeM ? parseInt(placeM[1]) : 0;
 
-                // Remap LCM distances to match app event names
-                let d = dist;
-                if (course === 'LCM') {
-                  if (d === '500'  && stroke === 'Free') d = '400';
-                  if (d === '1000' && stroke === 'Free') d = '800';
-                  if (d === '1650' && stroke === 'Free') d = '1500';
-                }
-
-                const eventKey = `${d} ${stroke} ${course}`;
+                // Use normalizeEvent() from event_utils.js for consistent
+                // distance remapping (LCM 500→400, 1000→800, 1650→1500 etc.)
+                // Build a pseudo-raw string that normalizeEvent() can parse.
+                const rawEvStr = `${dist} ${stroke}`;
+                const eventKey = normalizeEvent(rawEvStr, course) ||
+                                 `${dist} ${stroke} ${course}`;
                 const athInfo  = athleteById[athId];
 
                 rawResults.push({
@@ -283,38 +280,12 @@ function _secondsToTimeStr(secs) {
 }
 
 // ── Match a HY3 name to a roster athlete ─────────────────────
+// ── Athlete name matching ─────────────────────────────────────
+// Delegated to matchAthleteByName() in event_utils.js.
+// Kept as a thin alias so existing call-sites don't need changes.
+// HY-TEK stores names as "LAST, FIRST" — event_utils handles that format.
 function _matchRosterAthlete(hy3Name, gender) {
-  const name = hy3Name.toLowerCase().trim();
-  const parts = name.split(/\s+/);
-  const last  = parts[parts.length - 1];
-  const first = parts[0];
-
-  // 1. Exact full name
-  let hit = S.athletes.find(a => a.name.toLowerCase() === name);
-  if (hit) return hit;
-
-  // 2. Last name + first name exact
-  hit = S.athletes.find(a => {
-    const ap = a.name.toLowerCase().split(/\s+/);
-    return ap[ap.length - 1] === last && ap[0] === first;
-  });
-  if (hit) return hit;
-
-  // 3. Last name + first initial
-  hit = S.athletes.find(a => {
-    const ap = a.name.toLowerCase().split(/\s+/);
-    return ap[ap.length - 1] === last && ap[0][0] === first[0];
-  });
-  if (hit) return hit;
-
-  // 4. Last name only (unique match)
-  const lastMatches = S.athletes.filter(a => {
-    const ap = a.name.toLowerCase().split(/\s+/);
-    return ap[ap.length - 1] === last;
-  });
-  if (lastMatches.length === 1) return lastMatches[0];
-
-  return null;
+  return matchAthleteByName(hy3Name);
 }
 
 // ── Render the preview checklist ─────────────────────────────

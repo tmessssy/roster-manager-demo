@@ -6,9 +6,29 @@
 //  3. Stroke Radar  — compare two athletes across strokes
 //  4. Team Depth    — how many athletes hold cuts per event
 //
-//  Requires: Chart.js loaded in HTML before this file
+//  Requires: Chart.js 4.x loaded in HTML before this file
 //  Usage: add <script src="analytics.js"></script> after app.js
 // ============================================================
+
+// ── Chart.js availability guard ──────────────────────────────
+// If Chart.js failed to load (CDN down, slow network, offline)
+// we show a friendly fallback instead of crashing.
+function _chartJsAvailable() {
+  return typeof Chart !== 'undefined';
+}
+
+function _chartJsFallback(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = `
+    <div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">
+      <div style="font-size:28px;margin-bottom:8px;">📊</div>
+      <div style="font-weight:700;margin-bottom:4px;">Chart.js not loaded</div>
+      <div>Check your internet connection — this view requires the Chart.js library.</div>
+      <button class="btn bsm bs" style="margin-top:12px;"
+        onclick="location.reload()">Retry</button>
+    </div>`;
+}
 
 let _analyticsTab    = 'scatter';
 let _scGender        = 'all';
@@ -84,6 +104,14 @@ function renderAnalyticsPage() {
   const container = document.getElementById('analyticsPageContent');
   if (!container) return;
 
+  // Warn (but don't block) if Chart.js didn't load — heatmap/depth still work
+  if (!_chartJsAvailable()) {
+    const warn = document.createElement('div');
+    warn.style.cssText = 'background:#7c2d12;color:#fde68a;font-size:12px;padding:8px 12px;border-radius:8px;margin-bottom:10px;';
+    warn.innerHTML = '⚠️ Chart.js failed to load — Scatter and Radar views need an internet connection. Heatmap and Team Depth still work.';
+    container.prepend(warn);
+  }
+
   const stdOpts = S.standards
     .sort((a, b) => a.priority - b.priority)
     .map(s => `<option value="${s.id}">${s.name}</option>`)
@@ -102,6 +130,7 @@ function renderAnalyticsPage() {
       <button class="stab" onclick="switchAnalyticsTab('heatmap')">Cut Heatmap</button>
       <button class="stab" onclick="switchAnalyticsTab('radar')">Radar</button>
       <button class="stab" onclick="switchAnalyticsTab('depth')">Team Depth</button>
+      <button class="stab" onclick="switchAnalyticsTab('bubble')">On the Bubble</button>
     </div>
 
     <!-- ── SCATTER ── -->
@@ -175,6 +204,23 @@ function renderAnalyticsPage() {
         <div id="analytDpContainer"></div>
       </div>
     </div>
+
+
+    <!-- ── BUBBLE ── -->
+    <div id="analytBubble" style="display:none;">
+      <div class="fbar">
+        <div class="gtog">
+          <button class="gbtn aa" id="bbgAll" onclick="setBubbleG('all')">All</button>
+          <button class="gbtn" id="bbgM" onclick="setBubbleG('male')">Men</button>
+          <button class="gbtn" id="bbgF" onclick="setBubbleG('female')">Women</button>
+        </div>
+        <div style="font-size:10px;color:var(--muted);" id="bubbleThresholdNote"></div>
+      </div>
+      <div class="card">
+        <div id="bubbleList"></div>
+      </div>
+    </div>
+
   `;
 
   // Set defaults
@@ -196,17 +242,21 @@ function renderAnalyticsPage() {
 
 function switchAnalyticsTab(tab) {
   _analyticsTab = tab;
-  ['scatter','heatmap','radar','depth'].forEach(t => {
+  ['scatter','heatmap','radar','depth','bubble'].forEach(t => {
     const el = document.getElementById('analyt' + t.charAt(0).toUpperCase() + t.slice(1));
     if (el) el.style.display = t === tab ? 'block' : 'none';
   });
   document.querySelectorAll('#analytTabs .stab').forEach((b, i) => {
-    b.classList.toggle('active', ['scatter','heatmap','radar','depth'][i] === tab);
+    b.classList.toggle('active', ['scatter','heatmap','radar','depth','bubble'][i] === tab);
   });
   if (tab === 'scatter') drawAnalyticsScatter();
   if (tab === 'heatmap') drawAnalyticsHeatmap();
   if (tab === 'radar')   drawAnalyticsRadar();
   if (tab === 'depth')   drawAnalyticsDepth();
+  if (tab === 'bubble') {
+    if (typeof renderBubbleThresholdNote === 'function') renderBubbleThresholdNote();
+    if (typeof renderBubbleWidget === 'function') renderBubbleWidget(typeof bubbleGender !== 'undefined' ? bubbleGender : 'all');
+  }
 }
 
 function setAScatterGender(g) {
@@ -232,6 +282,7 @@ function setADepthGender(g) {
 
 // ── SCATTER ─────────────────────────────────────────────────
 function drawAnalyticsScatter() {
+  if (!_chartJsAvailable()) { _chartJsFallback('analytScCanvas'); return; }
   const ev = _scEvent || EVENTS[0];
 
   const pool = S.athletes.filter(a => {
@@ -438,6 +489,7 @@ function drawAnalyticsHeatmap() {
 
 // ── RADAR ────────────────────────────────────────────────────
 function drawAnalyticsRadar() {
+  if (!_chartJsAvailable()) { _chartJsFallback('analytRdCanvas'); return; }
   const id1 = document.getElementById('analytRdAth1')?.value;
   const id2 = document.getElementById('analytRdAth2')?.value;
   const a1  = S.athletes.find(a => a.id === id1);

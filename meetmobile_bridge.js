@@ -96,6 +96,7 @@ function ingestBridgeResult(bridgeResult) {
     athlete = S.athletes.find(a => a.id === bridgeResult.athleteId);
   }
   if (!athlete && bridgeResult.athleteName) {
+    // matchAthleteByName() is defined in event_utils.js
     athlete = matchAthleteByName(bridgeResult.athleteName);
   }
   if (!athlete) {
@@ -159,34 +160,10 @@ function ingestBridgeResult(bridgeResult) {
 }
 
 // ── Event normalizer ──────────────────────────────────────────
-// "100 Yard Free" + "SCY" → "100 Free SCY"
-// "200 Yard Individual Medley" → "200 IM SCY"
+// Delegated to event_utils.js (normalizeEvent) — single source of truth.
+// Kept as a thin alias so existing call-sites don't need changes.
 function normalizeEventForRoster(rawEvent, course) {
-  if (!rawEvent) return null;
-  const r = rawEvent.toLowerCase().replace('individual medley', 'im');
-
-  const distMatch = r.match(/(\d+)/);
-  if (!distMatch) return null;
-  let dist = distMatch[1];
-
-  let stroke = null;
-  if (r.includes('free'))   stroke = 'Free';
-  else if (r.includes('back'))   stroke = 'Back';
-  else if (r.includes('breast')) stroke = 'Breast';
-  else if (r.includes('fly') || r.includes('butterfly')) stroke = 'Fly';
-  else if (r.includes('im') || r.includes('medley'))     stroke = 'IM';
-
-  if (!stroke) return null;
-
-  // LCM distance remapping
-  if (course === 'LCM') {
-    if (dist === '500' && stroke === 'Free') dist = '400';
-    if (dist === '1000' && stroke === 'Free') dist = '800';
-    if (dist === '1650' && stroke === 'Free') dist = '1500';
-  }
-
-  const candidate = `${dist} ${stroke} ${course}`;
-  return EVENTS.includes(candidate) ? candidate : null;
+  return normalizeEvent(rawEvent, course);
 }
 
 // ── Status UI ─────────────────────────────────────────────────
